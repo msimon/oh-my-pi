@@ -12,6 +12,7 @@
 
 ### Fixed
 
+- Fixed selecting **auto** for the default model in `/model` (or `/settings`) leaving the previously-pinned concrete thinking suffix on `modelRoles.default` (e.g. `…:high`). That explicit suffix then overrode `defaultThinkingLevel: auto` on the next launch, so a freshly started session reverted to the old level instead of auto. Selecting auto now strips the per-role thinking suffix so the bare role inherits `auto`.
 - Fixed transcript scrollback stability on terminals with eager erase risk so completed assistant messages remain stable while new streaming lines are rendering
 - Fixed Ctrl+R history search results to remain globally sorted by prompt recency after merging FTS prefix matches with substring fallback matches.
 - Fixed Exa web search with no stored or environment credential to use the public Exa MCP fallback again, preserving the auth storage → `EXA_API_KEY` → `mcp.exa.ai` resolution order ([#1860](https://github.com/can1357/oh-my-pi/issues/1860)).

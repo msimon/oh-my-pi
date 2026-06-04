@@ -103,7 +103,6 @@ import type { Rule } from "../capability/rule";
 import { shouldEnableAppendOnlyContext } from "../config/append-only-context-mode";
 import { MODEL_ROLE_IDS, type ModelRegistry } from "../config/model-registry";
 import {
-	extractExplicitThinkingSelector,
 	formatModelSelectorValue,
 	formatModelString,
 	parseModelString,
@@ -5210,7 +5209,7 @@ export class AgentSession {
 		if (options?.persist) {
 			this.settings.setModelRole(
 				role,
-				this.#formatRoleModelValue(role, model, options.selector, options.thinkingLevel),
+				formatModelSelectorValue(options.selector ?? `${model.provider}/${model.id}`, options.thinkingLevel),
 			);
 		}
 		this.settings.getStorage()?.recordModelUsage(`${model.provider}/${model.id}`);
@@ -6928,22 +6927,6 @@ export class AgentSession {
 		return `${model.provider}/${model.id}`;
 	}
 
-	#formatRoleModelValue(
-		role: string,
-		model: Model,
-		selectorOverride?: string,
-		thinkingLevelOverride?: ThinkingLevel,
-	): string {
-		const modelKey = selectorOverride ?? `${model.provider}/${model.id}`;
-		if (thinkingLevelOverride !== undefined) {
-			return formatModelSelectorValue(modelKey, thinkingLevelOverride);
-		}
-		const existingRoleValue = this.settings.getModelRole(role);
-		if (!existingRoleValue) return modelKey;
-
-		const thinkingLevel = extractExplicitThinkingSelector(existingRoleValue, this.settings);
-		return formatModelSelectorValue(modelKey, thinkingLevel);
-	}
 	#resolveContextPromotionConfiguredTarget(currentModel: Model, availableModels: Model[]): Model | undefined {
 		const configuredTarget = currentModel.contextPromotionTarget?.trim();
 		if (!configuredTarget) return undefined;

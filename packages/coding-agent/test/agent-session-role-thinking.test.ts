@@ -71,6 +71,25 @@ describe("AgentSession role model thinking behavior", () => {
 		});
 	}
 
+	it("drops a stale role thinking suffix when the default model is set without a concrete level", async () => {
+		const model = getAnthropicModelOrThrow("claude-sonnet-4-5");
+		const selector = `${model.provider}/${model.id}`;
+		await createSession({
+			initialModelId: model.id,
+			initialThinkingLevel: Effort.High,
+			modelRoles: { default: `${selector}:high` },
+		});
+
+		// auto/inherit pass thinkingLevel: undefined, which must persist the bare role
+		// (dropping the baked `:high`) so a cold start inherits `defaultThinkingLevel`.
+		await session.setModel(model, "default", { selector, thinkingLevel: undefined, persist: true });
+		expect(sessionSettings.getModelRole("default")).toBe(selector);
+
+		// A concrete level still persists its suffix.
+		await session.setModel(model, "default", { selector, thinkingLevel: Effort.Low, persist: true });
+		expect(sessionSettings.getModelRole("default")).toBe(`${selector}:low`);
+	});
+
 	it("re-applies explicit role thinking each time that role is selected", async () => {
 		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
 		const slowModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
@@ -159,23 +178,6 @@ describe("AgentSession role model thinking behavior", () => {
 		expect(toSlow?.model.id).toBe(slowPlanModel.id);
 		expect(toSlow?.thinkingLevel).toBe(Effort.High);
 		expect(session.thinkingLevel).toBe(Effort.High);
-	});
-
-	it("preserves explicit role thinking when updating default model despite unresolved previous model", async () => {
-		const defaultModel = getAnthropicModelOrThrow("claude-sonnet-4-5");
-		const slowModel = getAnthropicModelOrThrow("claude-sonnet-4-6");
-
-		await createSession({
-			initialModelId: defaultModel.id,
-			initialThinkingLevel: Effort.High,
-			modelRoles: {
-				default: "anthropic/nonexistent-model:off",
-			},
-		});
-
-		await session.setModel(slowModel, "default", { persist: true });
-
-		expect(sessionSettings.getModelRole("default")).toBe(`${slowModel.provider}/${slowModel.id}:off`);
 	});
 
 	it("clamps unsupported selections from model metadata", async () => {
