@@ -310,7 +310,7 @@ export interface AgentSessionConfig {
 	sessionManager: SessionManager;
 	settings: Settings;
 	/** Models to cycle through with Ctrl+P (from --models flag) */
-	scopedModels?: Array<{ model: Model; thinkingLevel?: ThinkingLevel }>;
+	scopedModels?: Array<{ model: Model; thinkingLevel?: ThinkingLevel; auto?: boolean }>;
 	/** Initial session thinking selector. */
 	thinkingLevel?: ConfiguredThinkingLevel;
 	/** Prompt templates for expansion */
@@ -451,6 +451,7 @@ export interface ResolvedRoleModel {
 	model: Model;
 	thinkingLevel?: ThinkingLevel;
 	explicitThinkingLevel: boolean;
+	auto?: boolean;
 }
 
 /** The set of resolvable role models plus the index of the currently active
@@ -829,7 +830,7 @@ export class AgentSession {
 
 	readonly configWarnings: string[] = [];
 
-	#scopedModels: Array<{ model: Model; thinkingLevel?: ThinkingLevel }>;
+	#scopedModels: Array<{ model: Model; thinkingLevel?: ThinkingLevel; auto?: boolean }>;
 	/** Effective, metadata-clamped thinking level applied to the agent (never `auto`). */
 	#thinkingLevel: ThinkingLevel | undefined;
 	/** True when the user configured `auto`; the effective level is resolved per turn. */
@@ -4094,7 +4095,7 @@ export class AgentSession {
 	}
 
 	/** Scoped models for cycling (from --models flag) */
-	get scopedModels(): ReadonlyArray<{ model: Model; thinkingLevel?: ThinkingLevel }> {
+	get scopedModels(): ReadonlyArray<{ model: Model; thinkingLevel?: ThinkingLevel; auto?: boolean }> {
 		return this.#scopedModels;
 	}
 
@@ -5554,6 +5555,7 @@ export class AgentSession {
 				model: resolved.model,
 				thinkingLevel: resolved.thinkingLevel,
 				explicitThinkingLevel: resolved.explicitThinkingLevel,
+				auto: resolved.auto,
 			});
 		}
 
@@ -5575,7 +5577,9 @@ export class AgentSession {
 	 */
 	async applyRoleModel(entry: ResolvedRoleModel): Promise<void> {
 		await this.setModel(entry.model, entry.role);
-		if (entry.explicitThinkingLevel && entry.thinkingLevel !== undefined) {
+		if (entry.auto) {
+			this.setThinkingLevel(AUTO_THINKING);
+		} else if (entry.explicitThinkingLevel && entry.thinkingLevel !== undefined) {
 			this.setThinkingLevel(entry.thinkingLevel);
 		}
 	}
@@ -5601,9 +5605,9 @@ export class AgentSession {
 		return { model: next.model, thinkingLevel: this.thinkingLevel, role: next.role };
 	}
 
-	async #getScopedModelsWithApiKey(): Promise<Array<{ model: Model; thinkingLevel?: ThinkingLevel }>> {
+	async #getScopedModelsWithApiKey(): Promise<Array<{ model: Model; thinkingLevel?: ThinkingLevel; auto?: boolean }>> {
 		const apiKeysByProvider = new Map<string, string | undefined>();
-		const result: Array<{ model: Model; thinkingLevel?: ThinkingLevel }> = [];
+		const result: Array<{ model: Model; thinkingLevel?: ThinkingLevel; auto?: boolean }> = [];
 
 		for (const scoped of this.#scopedModels) {
 			const provider = scoped.model.provider;
@@ -5643,7 +5647,7 @@ export class AgentSession {
 		this.settings.getStorage()?.recordModelUsage(`${next.model.provider}/${next.model.id}`);
 
 		// Apply the scoped model's configured thinking level, preserving auto.
-		this.setThinkingLevel(this.#autoThinking ? AUTO_THINKING : next.thinkingLevel);
+		this.setThinkingLevel(next.auto || this.#autoThinking ? AUTO_THINKING : next.thinkingLevel);
 		await this.#syncAfterModelChange(previousEditMode);
 
 		return { model: next.model, thinkingLevel: this.thinkingLevel, isScoped: true };
